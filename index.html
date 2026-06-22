@@ -59,6 +59,23 @@
     justify-content: space-between;
     padding: 14px 18px 10px;
   }
+  .back-btn {
+    background: none;
+    border: none;
+    color: white;
+    font-size: 15px;
+    font-weight: 700;
+    padding: 4px 8px 4px 2px;
+    cursor: pointer;
+    display: none;
+    align-items: center;
+    gap: 4px;
+    opacity: 0.9;
+    flex-shrink: 0;
+  }
+  .back-btn.visible { display: flex; }
+  .back-btn:active { opacity: 0.6; }
+
   .header-title {
     display: flex;
     align-items: baseline;
@@ -251,7 +268,48 @@
     font-size: 15px;
     flex-shrink: 0;
     font-weight:700;
+    overflow: hidden;
+    position: relative;
   }
+  .store-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 8px;
+  }
+  .detail-store-icon {
+    width: 56px;
+    height: 56px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight:700;
+    overflow: hidden;
+    position: relative;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .detail-store-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    border-radius: 12px;
+  }
+  .detail-photo-hint {
+    position: absolute;
+    bottom: 0; left: 0; right: 0;
+    background: rgba(0,0,0,0.45);
+    color: white;
+    font-size: 9px;
+    text-align: center;
+    padding: 2px 0;
+    border-radius: 0 0 12px 12px;
+    font-weight: 700;
+    letter-spacing: 0.03em;
+  }
+  .detail-store-icon:active { opacity: 0.75; }
   .card-main { flex: 1; min-width: 0; }
   .card-row1 {
     display: flex;
@@ -1044,6 +1102,7 @@
 <!-- App Header -->
 <header class="app-header">
   <div class="header-top">
+    <button class="back-btn" id="backBtn" onclick="goBack()">‹ 返回</button>
     <div class="header-title">
       <h1>🇰🇷 代購進貨單</h1>
       <span id="totalCount">0 筆</span>
@@ -1519,7 +1578,14 @@ function populateStoreSelects() {
 //  VIEWS
 // ══════════════════════════════════
 let activeView = 'list';
-function switchView(name, tabEl, navEl) {
+let viewHistory = [];
+
+function switchView(name, tabEl, navEl, pushHistory = false) {
+  if (pushHistory && activeView && activeView !== name) {
+    viewHistory.push(activeView);
+  } else if (!pushHistory) {
+    viewHistory = [];
+  }
   activeView = name;
   document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
   document.getElementById('view-' + name).classList.add('active');
@@ -1529,6 +1595,29 @@ function switchView(name, tabEl, navEl) {
   if (navEl) navEl.classList.add('active');
   if (name === 'stats') renderStats();
   if (name === 'inventory') renderInventory();
+  const backBtn = document.getElementById('backBtn');
+  if (backBtn) backBtn.classList.toggle('visible', viewHistory.length > 0);
+}
+
+function goBack() {
+  if (viewHistory.length === 0) return;
+  const prev = viewHistory.pop();
+  activeView = prev;
+  document.querySelectorAll('.view').forEach(v => v.classList.remove('active'));
+  document.getElementById('view-' + prev).classList.add('active');
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  const viewOrder = ['list','stats','inventory','export'];
+  const tabIdx = viewOrder.indexOf(prev);
+  const tabBtns = document.querySelectorAll('.tab-btn');
+  if (tabIdx >= 0 && tabBtns[tabIdx]) tabBtns[tabIdx].classList.add('active');
+  const navMap = {list:0, stats:1, inventory:2, export:3};
+  const navBtns = document.querySelectorAll('.nav-btn');
+  if (navMap[prev] !== undefined && navBtns[navMap[prev]]) navBtns[navMap[prev]].classList.add('active');
+  if (prev === 'stats') renderStats();
+  if (prev === 'inventory') renderInventory();
+  const backBtn = document.getElementById('backBtn');
+  if (backBtn) backBtn.classList.toggle('visible', viewHistory.length > 0);
 }
 
 // ══════════════════════════════════
@@ -1573,7 +1662,7 @@ function goToFilteredList(field, value) {
   document.getElementById(field).value = value;
   const tabEl = document.querySelectorAll('.tab-btn')[0];
   const navEl = document.querySelectorAll('.nav-btn')[0];
-  switchView('list', tabEl, navEl);
+  switchView('list', tabEl, navEl, true);
   renderList();
 }
 
@@ -1669,7 +1758,7 @@ function renderList() {
 
     return `<div class="order-card" onclick="openDetail('${o.id}')">
       <div class="card-top">
-        <div class="store-icon" style="background:${store.bg};color:${store.color}">${store.short}</div>
+        <div class="store-icon" style="background:${store.bg};color:${store.color}">${o.photo ? `<img src="${o.photo}" alt="">` : store.short}</div>
         <div class="card-main">
           <div class="card-row1">
             <div class="card-store-name">${store.emoji} ${storeName}</div>
@@ -2237,7 +2326,10 @@ function openDetail(id) {
 
   document.getElementById('detailBody').innerHTML = `
     <div class="detail-store-header">
-      <div class="detail-store-icon" style="background:${store.bg};color:${store.color}">${store.emoji}</div>
+      <div class="detail-store-icon" style="background:${store.bg};color:${store.color}" onclick="triggerOrderPhotoUpload('${o.id}')">
+        ${o.photo ? `<img src="${o.photo}" alt="">` : store.emoji}
+        <div class="detail-photo-hint">${o.photo ? '換圖' : '上傳'}</div>
+      </div>
       <div class="detail-store-info">
         <h2>${store.name}</h2>
         <p>${o.date}</p>
@@ -2265,6 +2357,62 @@ function openDetail(id) {
       <button class="btn-primary" onclick="openEditSheet('${o.id}')">編輯</button>
     </div>`;
   openSheet('detailSheet');
+}
+
+// ══════════════════════════════════
+//  ORDER PHOTO UPLOAD
+// ══════════════════════════════════
+let _photoUploadOrderId = null;
+
+function triggerOrderPhotoUpload(id) {
+  _photoUploadOrderId = id;
+  let inp = document.getElementById('_orderPhotoInput');
+  if (!inp) {
+    inp = document.createElement('input');
+    inp.type = 'file';
+    inp.accept = 'image/*';
+    inp.id = '_orderPhotoInput';
+    inp.style.display = 'none';
+    inp.onchange = onOrderPhotoSelected;
+    document.body.appendChild(inp);
+  }
+  inp.value = '';
+  inp.click();
+}
+
+function onOrderPhotoSelected(e) {
+  const file = e.target.files[0];
+  if (!file || !_photoUploadOrderId) return;
+  const order = orders.find(o => o.id === _photoUploadOrderId);
+  if (!order) return;
+
+  compressImage(file, 400, 0.82, (b64) => {
+    order.photo = b64;
+    saveData();
+    renderList();
+    // 重新開啟 detail 以更新圖示
+    openDetail(_photoUploadOrderId);
+    showToast('照片已儲存 ✓');
+  });
+}
+
+function compressImage(file, maxSize, quality, callback) {
+  const reader = new FileReader();
+  reader.onload = ev => {
+    const img = new Image();
+    img.onload = () => {
+      const scale = Math.min(1, maxSize / Math.max(img.width, img.height));
+      const w = Math.round(img.width * scale);
+      const h = Math.round(img.height * scale);
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+      callback(canvas.toDataURL('image/jpeg', quality));
+    };
+    img.src = ev.target.result;
+  };
+  reader.readAsDataURL(file);
 }
 
 // ══════════════════════════════════
